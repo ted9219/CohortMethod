@@ -54,8 +54,9 @@
 #'                                 determine the hyperparameters of the prior (if applicable). See
 #'                                 [Cyclops::createControl()] for details.
 #' @param estimator                The type of estimator for the IPTW. Options are `estimator = "ate"`
-#'                                 for the average treatment effect, and `estimator = "att"` for the
-#'                                 average treatment effect in the treated.
+#'                                 for the average treatment effect, `estimator = "att"` for the
+#'                                 average treatment effect in the treated, `estimator = "overlap"` 
+#'                                 for the propensity score overlap weighting.
 #'
 #' @references
 #' Xu S, Ross C, Raebel MA, Shetterly S, Blanchette C, Smith D. Use of stabilized inverse propensity scores
@@ -96,7 +97,7 @@ createPs <- function(cohortMethodData,
   checkmate::assertLogical(stopOnError, len = 1, add = errorMessages)
   checkmate::assertClass(prior, "cyclopsPrior", add = errorMessages)
   checkmate::assertClass(control, "cyclopsControl", add = errorMessages)
-  checkmate::assertChoice(estimator, c("ate", "att"), add = errorMessages)
+  checkmate::assertChoice(estimator, c("ate", "att", "overlap"), add = errorMessages)
   checkmate::reportAssertions(collection = errorMessages)
 
   if (is.null(population)) {
@@ -288,11 +289,18 @@ computeIptw <- function(population, estimator = "ate") {
       mean(population$treatment == 1) / population$propensityScore,
       mean(population$treatment == 0) / (1 - population$propensityScore)
     )
-  } else {
+  }  else if (estimator == 'overlap'){
+    # PS overlap:
+    population$iptw <- ifelse(population$treatment == 1,
+                              1 - population$propensityScore,
+                              population$propensityScore
+    )
+    
+  } else{
     # 'Stabilized' ATT:
     population$iptw <- ifelse(population$treatment == 1,
-      mean(population$treatment == 1),
-      mean(population$treatment == 0) * population$propensityScore / (1 - population$propensityScore)
+                              mean(population$treatment == 1),
+                              mean(population$treatment == 0) * population$propensityScore / (1 - population$propensityScore)
     )
   }
   return(population)
